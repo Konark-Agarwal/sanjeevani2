@@ -11,7 +11,7 @@ const translations = {
     registerNow: 'Register Now',
     welcome: 'Welcome to Sanjeevani',
     description: 'Your trusted medical emergency platform.',
-    // Add more keys for other components
+    // Add more keys for other components (e.g., buttons, labels)
   },
   hi: {
     howItWorks: 'यह कैसे काम करता है',
@@ -22,28 +22,23 @@ const translations = {
     registerNow: 'अभी पंजीकरण करें',
     welcome: 'संजीवनी में आपका स्वागत है',
     description: 'आपका विश्वसनीय चिकित्सा आपातकालीन प्लेटफॉर्म।',
-    // Add more keys for other components
+    // Add more keys for other components (e.g., buttons, labels)
   },
   // Add more languages: es, fr, etc.
 };
 
+// Supported languages (expand as needed)
+const supportedLangs = ['en', 'hi', 'es', 'fr', 'de', 'zh', 'ar', 'bn'];
+
 // Detect user's language from browser or IP
 export const detectUserLanguage = () => {
   if (typeof window !== 'undefined') {
-    // Option 1: Check browser language
     const browserLang = navigator.language || navigator.userLanguage;
-    const shortLang = browserLang.split('-')[0]; // 'en-US' → 'en'
-    
-    // Supported languages in our app
-    const supportedLangs = Object.keys(translations);
-    
+    const shortLang = browserLang.split('-')[0];
     if (supportedLangs.includes(shortLang)) {
       return shortLang;
     }
-    
-    // Option 2: Try to get from IP location (simplified)
-    // In production, use an IP geolocation service
-    return 'en'; // Default to English
+    return 'en'; // Default
   }
   return 'en';
 };
@@ -65,10 +60,10 @@ export const getSavedLanguage = () => {
 const LanguageContext = createContext();
 
 export const LanguageProvider = ({ children }) => {
-  const [language, setLanguage] = useState('en'); // Default
+  const [language, setLanguage] = useState('en');
+  const [translationsCache, setTranslationsCache] = useState({}); // Cache translations
 
   useEffect(() => {
-    // Load saved language or detect from browser
     const savedLang = getSavedLanguage();
     const detectedLang = savedLang || detectUserLanguage();
     setLanguage(detectedLang);
@@ -77,9 +72,31 @@ export const LanguageProvider = ({ children }) => {
   const changeLanguage = (lang) => {
     setLanguage(lang);
     saveLanguagePreference(lang);
+    setTranslationsCache({}); // Clear cache on language change
   };
 
-  const t = (key) => translations[language]?.[key] || key; // Translation function
+  // Translation function using your API route
+  const t = async (key, defaultText = key) => {
+    if (language === 'en') return defaultText; // No translation needed for English
+    if (translationsCache[key]) return translationsCache[key]; // Use cached translation
+
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: defaultText, targetLang: language }),
+      });
+      const data = await response.json();
+      if (data.translatedText) {
+        setTranslationsCache((prev) => ({ ...prev, [key]: data.translatedText }));
+        return data.translatedText;
+      }
+      return defaultText; // Fallback
+    } catch (error) {
+      console.error('Translation error:', error);
+      return defaultText; // Fallback to original text
+    }
+  };
 
   return (
     <LanguageContext.Provider value={{ language, changeLanguage, t }}>
